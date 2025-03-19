@@ -10,22 +10,20 @@ void process_instruction()
      * access memory. 
      * */
     int current_instruction = mem_read_32(CURRENT_STATE.PC);
-    int opcode = current_instruction >> 26;
-    int rn = (current_instruction >> 16) & 0x1F;
-    int rd = (current_instruction >> 12) & 0x1F;
-    int rm = current_instruction & 0x1F;
-    int imm = current_instruction & 0xFF;
-    int imm2 = current_instruction & 0xFFF;
-    int imm3 = current_instruction & 0x7FF;
-    int imm4 = current_instruction & 0xFFFF;
-    int imm5 = current_instruction & 0x7FF;
-    int imm6 = current_instruction & 0x3FF;
-    int imm7 = current_instruction & 0x7FF;
-    int imm8 = current_instruction & 0xFF;
-    int imm9 = current_instruction & 0x1FF;
+    int opcode = (current_instruction & 0xFFF00000) >> 20; // Masking and then shifting to get the correct 12-bit opcodeint opcode = current_instruction >> 20;
+
     //print for debugging
     printf("current_instruction: %x\n", current_instruction);
     printf("opcode: %x\n", opcode);
-    //printf("rn: %x\n", rn);
-    //printf("rd: %x\n", rd);
+    //avanzar el PC
+    if(current_instruction == 0xd4400000){
+        //HALTEAR
+        printf("HALTEAR\n");
+        RUN_BIT = 0;
+    }
+    NEXT_STATE.PC += 4;
 }
+
+// void haltear(){
+//     RUN_BIT = 0;
+// }
