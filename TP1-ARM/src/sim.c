@@ -3,43 +3,121 @@
 #include <string.h>
 #include "shell.h"
 
-// Instruction field masks
-#define OPCODE_MASK 0xFFF00000
-#define OPCODE_SHIFT 20
-#define RD_MASK 0x00000F80
-#define RD_SHIFT 7
-#define RN_MASK 0x0000001F
-#define RN_SHIFT 0
-#define RM_MASK 0x0000001F
-#define RM_SHIFT 16
-#define IMM_MASK 0x00000FFF
-#define IMM_SHIFT 0
-#define SHIFT_MASK 0x00000060
-#define SHIFT_SHIFT 5
-#define COND_MASK 0x0F000000
-#define COND_SHIFT 24
-#define ADDR_MASK 0x00000FFF
-#define ADDR_SHIFT 0
+/* Instrucciones principales */
+#define OP_ADD_EXT_REG      0x8B000000  // 10001011001 (bits 31-21)
+#define OP_ADD_IMM          0x91000000  // 10010001 (bits 31-24)
+#define OP_ADDS_EXT_REG     0xAB000000  // 10101011001 (bits 31-21)
+#define OP_ADDS_IMM         0xB1000000  // 10110001 (bits 31-24)
+#define OP_MUL              0x9B007C00  // 10011011000 (bits 31-21)
+#define OP_SUBS_EXT_REG     0xEB000000  // 11101011001 (bits 31-21)
+#define OP_SUBS_IMM         0xF1000000  // 11110001 (bits 31-24)
 
-// Instruction opcodes
-#define OP_ADDS 0xB1000000
-#define OP_SUBS 0x6B000000
-#define OP_ADD 0x0B000000
-#define OP_MUL 0x9B007C00
-#define OP_CMP 0x6B00001F
-#define OP_ANDS 0x6A000000
-#define OP_EOR 0x4A000000
-#define OP_ORR 0x2A000000
-#define OP_B 0x14000000
-#define OP_BR 0xD61F0000
-#define OP_CBZ 0xB4000000
-#define OP_CBNZ 0xB5000000
-#define OP_LSL 0xD3400000
-#define OP_LSR 0xD3400400
-#define OP_LDUR 0xF8400000
-#define OP_STUR 0xF8000000
-#define OP_MOVZ 0xD2800000
-#define OP_HLT 0xD4400000
+/* Comparaciones (alias de SUBS) */
+#define OP_CMP_EXT_REG      OP_SUBS_EXT_REG  // Mismo opcode que SUBS_EXT_REG
+#define OP_CMP_IMM          OP_SUBS_IMM      // Mismo opcode que SUBS_IMM
+
+/* Operaciones lógicas */
+#define OP_ANDS             0xEA000000  // 11101010 (bits 31-24)
+#define OP_EOR              0xCA000000  // 11001010 (bits 31-24)
+#define OP_ORR              0xAA000000  // 10101010 (bits 31-24)
+
+/* Saltos */
+#define OP_B                0x14000000  // 100101 (bits 31-26)
+#define OP_BR               0xD61F0000  // 11010110000 (bits 31-21)
+#define OP_B_COND           0x54000000  // 01010100 (bits 31-24)
+
+/* Shifts */
+#define OP_LSL              0xD3400000  // 110100110 (bits 31-23) + N=0
+#define OP_LSR              0xD3400000  // 110100110 (bits 31-23) + N=1
+
+/* Load/Store */
+#define OP_STUR             0xF8000000  // 11111000000 (bits 31-21)
+#define OP_STURB            0x38000000  // 00111000000 (bits 31-21)
+#define OP_STURH            0x78000000  // 01111000000 (bits 31-21)
+#define OP_LDUR             0xF8400000  // 11111000010 (bits 31-21)
+#define OP_LDURB            0x38400000  // 00111000010 (bits 31-21)
+#define OP_LDURH            0x78400000  // 01111000010 (bits 31-21)
+
+/* Otras */
+#define OP_MOVZ             0xD2800000  // 110100101 (bits 31-23)
+#define OP_CBZ              0xB4000000  // 10110100 (bits 31-24)
+#define OP_CBNZ             0xB5000000  // 10110101 (bits 31-24)
+#define OP_HLT              0xD4000000  // 11010100 (bits 31-24)
+
+/* Máscaras para bits variables */
+#define MASK_ADDS_SHIFT     0x00C00000  // bits 23-22 (shift)
+#define MASK_ADDS_IMM12     0x003FFC00  // bits 21-10 (imm12)
+#define MASK_B_COND_IMM19   0x00FFFFE0  // bits 23-5 (imm19)
+#define MASK_B_IMM26        0x03FFFFFF  // bits 25-0 (imm26)
+#define MASK_LDST_IMM9      0x003FF000  // bits 20-12 (imm9)
+#define MASK_REG_RD         0x0000001F  // bits 4-0
+#define MASK_REG_RN         0x000003E0  // bits 9-5
+#define MASK_REG_RM         0x001F0000  // bits 20-16
+
+/* Máscaras para opcodes de longitud conocida */
+#define MASK_OP_21         0xFFE00000  // bits 31-21
+#define MASK_OP_24         0xFF000000  // bits 31-24
+#define MASK_OP_26         0xFC000000  // bits 31-26
+#define MASK_OP_23         0xFF800000  // bits 31-23
+
+
+typedef enum {
+    /* Instrucciones principales */
+    INST_ADD_REG,
+    INST_ADD_IM,
+    INST_ADDS_REG,
+    INST_ADDS_IM,
+    INST_MUL,
+    INST_SUBS_REG,
+    INST_SUBS_IM,
+    
+    /* Comparaciones (alias de SUBS) */
+    INST_CMP_REG,
+    INST_CMP_IM,
+    
+    /* Operaciones lógicas */
+    INST_ANDS,
+    INST_EOR,
+    INST_ORR,
+    
+    /* Saltos */
+    INST_B,
+    INST_BR,
+    INST_B_COND,
+    
+    /* Shifts */
+    INST_LSL,
+    INST_LSR,
+    
+    /* Load/Store */
+    INST_STUR,
+    INST_STURB,
+    INST_STURH,
+    INST_LDUR,
+    INST_LDURB,
+    INST_LDURH,
+    
+    /* Otras */
+    INST_MOVZ,
+    INST_CBZ,
+    INST_CBNZ,
+    INST_HLT,
+    
+    INST_UNKNOWN
+} InstructionType;
+
+typedef struct {
+    InstructionType type;
+    uint16_t opcode;
+    uint8_t Rd;
+    uint8_t Rn;
+    uint8_t Rm;
+    uint8_t Rt;
+    int64_t imm;
+    uint32_t cond;
+    uint8_t shift;
+    // Otros campos según necesidad
+} DecodedInstruction;
 
 // Helper functions
 static void update_flags(int64_t result) {
@@ -47,140 +125,240 @@ static void update_flags(int64_t result) {
     NEXT_STATE.FLAG_Z = (result == 0);
 }
 
-static int64_t get_shifted_operand(int64_t value, int shift_type, int shift_amount) {
-    switch(shift_type) {
-        case 0: return value; // LSL
-        case 1: return value >> shift_amount; // LSR
-        default: return value;
+static uint32_t shift_and_mask(uint32_t number, int shift_amount, int mask_bits) {
+    uint32_t shifted = number >> shift_amount;
+    uint32_t mask = (1U << mask_bits) - 1; // Create a mask with the first `mask_bits` set to 1
+    return shifted & mask;
+}
+
+// Add this function to sim.c or an appropriate file
+int32_t sign_extend(int32_t value, int bits) {
+    int32_t mask = 1 << (bits - 1);
+    return (value ^ mask) - mask;
+}
+
+DecodedInstruction decode_instruction(uint32_t instruction) {
+    DecodedInstruction inst = {INST_UNKNOWN};
+    
+    //─────────────────────── ARITMÉTICAS/COMPARACIÓN ──────────────────────
+    if ((instruction & MASK_OP_21) == OP_ADD_EXT_REG) {
+        inst.type = INST_ADD_REG;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
     }
+    else if ((instruction & MASK_OP_24) == OP_ADD_IMM) {
+        inst.type = INST_ADD_IM;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_ADDS_IMM12) >> 10;
+        inst.shift = (instruction & MASK_ADDS_SHIFT) >> 22;
+    }
+    else if ((instruction & MASK_OP_21) == OP_ADDS_EXT_REG) {
+        inst.type = INST_ADDS_REG;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
+    }
+    else if ((instruction & MASK_OP_24) == OP_ADDS_IMM) {
+        inst.type = INST_ADDS_IM;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_ADDS_IMM12) >> 10;
+        inst.shift = (instruction & MASK_ADDS_SHIFT) >> 22;
+    }
+    else if ((instruction & MASK_OP_21) == OP_MUL) {
+        inst.type = INST_MUL;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
+    }
+    else if ((instruction & MASK_OP_21) == OP_SUBS_EXT_REG) {
+        inst.type = (instruction & MASK_REG_RD) == 31 ? INST_CMP_REG : INST_SUBS_REG;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
+    }
+    else if ((instruction & MASK_OP_24) == OP_SUBS_IMM) {
+        inst.type = (instruction & MASK_REG_RD) == 31 ? INST_CMP_IM : INST_SUBS_IM;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_ADDS_IMM12) >> 10;
+        inst.shift = (instruction & MASK_ADDS_SHIFT) >> 22;
+    }
+    // HALT
+    else if ((instruction & MASK_OP_24) == OP_HLT) {
+        inst.type = INST_HLT;
+    }
+
+    //────────────────────────────── LÓGICAS ──────────────────────────────
+    else if ((instruction & OP_ANDS) == OP_ANDS) {
+        inst.type = INST_ANDS;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
+    }
+    else if ((instruction & OP_EOR) == OP_EOR) {
+        inst.type = INST_EOR;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
+    }
+    else if ((instruction & OP_ORR) == OP_ORR) {
+        inst.type = INST_ORR;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.Rm = (instruction & MASK_REG_RM) >> 16;
+    }
+    //────────────────────────────── SALTOS ───────────────────────────────
+    else if ((instruction & MASK_OP_26) == OP_B) {
+        inst.type = INST_B;
+        inst.imm = (instruction & MASK_B_IMM26) << 2;
+        inst.imm = sign_extend(inst.imm, 28);  // Sign-extend para saltos relativos
+    }
+    else if ((instruction & MASK_OP_21) == OP_BR) {
+        inst.type = INST_BR;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+    }
+    else if ((instruction & MASK_OP_24) == OP_B_COND) {
+        inst.type = INST_B_COND;
+        inst.cond = instruction & 0x0F;
+        inst.imm = (instruction & MASK_B_COND_IMM19) >> 5;
+        inst.imm = sign_extend(inst.imm << 2, 21);  // Sign-extend de 21 bits
+    }
+    //───────────────────────────── LOAD/STORE ─────────────────────────────
+    else if ((instruction & MASK_OP_21) == OP_STUR) {
+        inst.type = INST_STUR;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_LDST_IMM9) >> 12;
+    }
+    else if ((instruction & MASK_OP_21) == OP_LDUR) {
+        inst.type = INST_LDUR;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_LDST_IMM9) >> 12;
+    }
+    else if ((instruction & MASK_OP_21) == OP_STURB) {
+        inst.type = INST_STURB;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_LDST_IMM9) >> 12;
+    }
+    else if ((instruction & MASK_OP_21) == OP_LDURB) {
+        inst.type = INST_LDURB;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_LDST_IMM9) >> 12;
+    }
+    else if ((instruction & MASK_OP_21) == OP_STURH) {
+        inst.type = INST_STURH;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_LDST_IMM9) >> 12;
+    }
+    else if ((instruction & MASK_OP_21) == OP_LDURH) {
+        inst.type = INST_LDURH;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction & MASK_LDST_IMM9) >> 12;
+    }
+    
+    //─────────────────────────────── OTROS ────────────────────────────────
+    else if ((instruction & MASK_OP_23) == OP_MOVZ) {
+        inst.type = INST_MOVZ;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.imm = (instruction >> 5) & 0xFFFF;
+    }
+    else if ((instruction & MASK_OP_23) == OP_LSL) {
+        inst.type = INST_LSL;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction >> 10) & 0x3F;
+    }
+    else if ((instruction & MASK_OP_23) == OP_LSR) {
+        inst.type = INST_LSR;
+        inst.Rd = instruction & MASK_REG_RD;
+        inst.Rn = (instruction & MASK_REG_RN) >> 5;
+        inst.imm = (instruction >> 10) & 0x3F;
+    }
+
+
+    else if ((instruction & MASK_OP_24) == OP_CBZ) {
+        inst.type = INST_CBZ;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.imm = (instruction >> 5) & 0x7FFFF;
+    }
+
+    else if ((instruction & MASK_OP_24) == OP_CBNZ) {
+        inst.type = INST_CBNZ;
+        inst.Rt = instruction & MASK_REG_RD;
+        inst.imm = (instruction >> 5) & 0x7FFFF;
+    }
+    else {
+        inst.type = INST_UNKNOWN;
+        printf("Instrucción desconocida: %08X\n", instruction);
+    }
+    return inst;
 }
 
 void process_instruction() {
     uint32_t instruction = mem_read_32(CURRENT_STATE.PC);
-    uint32_t opcode = (instruction & OPCODE_MASK) >> OPCODE_SHIFT;
-    printf("opcode: %x\n", opcode);
-    uint32_t rd = (instruction & RD_MASK) >> RD_SHIFT;
-    uint32_t rn = (instruction & RN_MASK) >> RN_SHIFT;
-    uint32_t rm = (instruction & RM_MASK) >> RM_SHIFT;
-    uint32_t imm = (instruction & IMM_MASK) >> IMM_SHIFT;
-    uint32_t shift = (instruction & SHIFT_MASK) >> SHIFT_SHIFT;
-    uint32_t cond = (instruction & COND_MASK) >> COND_SHIFT;
-    uint32_t addr = (instruction & ADDR_MASK) >> ADDR_SHIFT;
+    DecodedInstruction inst = decode_instruction(instruction);
+    // muestra en salida los detalles de la instrucción decodificada
+    printf("Instruction: %08X\n", instruction);
+    printf("Type: %d\n", inst.type);
+    printf("Rd: %d\n", inst.Rd);
+    printf("Rn: %d\n", inst.Rn);
+    printf("imm: %ld\n", inst.imm);
+    printf("shift: %d\n", inst.shift);
 
-    // Initialize NEXT_STATE with CURRENT_STATE
-    NEXT_STATE = CURRENT_STATE;
+        switch (inst.type) {
+        case INST_ADD_REG:
+            // Implementar lógica de ADD_REG
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + CURRENT_STATE.REGS[inst.Rm];
+            
 
+            break;
+        case INST_ADD_IM:
+            // Implementar lógica de ADD_IM
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + (inst.imm << inst.shift);
+            break;
 
-    // Handle HLT instruction first
-    if (instruction == OP_HLT) {
-        RUN_BIT = 0;
-        NEXT_STATE.PC += 4;
-        return;
-    }
-    //printf("caso adds: %x\n", OP_ADDS >> (OPCODE_SHIFT));
+        case INST_ADDS_REG:
+            // Implementar lógica de ADDS_REG
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + CURRENT_STATE.REGS[inst.Rm];
+            update_flags(NEXT_STATE.REGS[inst.Rd]);
+            break;
 
-    // Process different instruction types
-    switch(opcode) {
-        case (OP_ADDS >> OPCODE_SHIFT): {
-            printf("caso adds: %x\n", OP_ADDS >> (OPCODE_SHIFT));
-            int64_t operand2 = get_shifted_operand(imm, shift, 12);
-            int64_t result = CURRENT_STATE.REGS[rn] + operand2;
-            NEXT_STATE.REGS[rd] = result;
-            update_flags(result);
+        case INST_ADDS_IM:
+            // Implementar lógica de ADDS_IM
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + (inst.imm << inst.shift);
+            update_flags(NEXT_STATE.REGS[inst.Rd]);
             break;
-        }
-        // case (OP_SUBS >> OPCODE_SHIFT): {
-        //     int64_t operand2 = get_shifted_operand(imm, shift, 12);
-        //     int64_t result = CURRENT_STATE.REGS[rn] - operand2;
-        //     NEXT_STATE.REGS[rd] = result;
-        //     update_flags(result);
-        //     break;
-        // }
-        case (OP_ADD >> OPCODE_SHIFT): {
-            int64_t operand2 = get_shifted_operand(imm, shift, 12);
-            NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rn] + operand2;
-            break;
-        }
-        case (OP_MUL >> OPCODE_SHIFT): {
-            NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rn] * CURRENT_STATE.REGS[rm];
-            break;
-        }
-        case (OP_CMP >> OPCODE_SHIFT): {
-            int64_t operand2 = get_shifted_operand(imm, shift, 12);
-            int64_t result = CURRENT_STATE.REGS[rn] - operand2;
-            update_flags(result);
-            break;
-        }
-        case (OP_ANDS >> OPCODE_SHIFT): {
-            int64_t operand2 = get_shifted_operand(imm, shift, 12);
-            int64_t result = CURRENT_STATE.REGS[rn] & operand2;
-            NEXT_STATE.REGS[rd] = result;
-            update_flags(result);
-            break;
-        }
-        case (OP_EOR >> OPCODE_SHIFT): {
-            int64_t operand2 = get_shifted_operand(imm, shift, 12);
-            NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rn] ^ operand2;
-            break;
-        }
-        case (OP_ORR >> OPCODE_SHIFT): {
-            int64_t operand2 = get_shifted_operand(imm, shift, 12);
-            NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rn] | operand2;
-            break;
-        }
-        case (OP_B >> OPCODE_SHIFT): {
-            int64_t offset = ((int64_t)addr << 2);
-            NEXT_STATE.PC += offset;
-            return;
-        }
-        case (OP_BR >> OPCODE_SHIFT): {
-            NEXT_STATE.PC = CURRENT_STATE.REGS[rn];
-            return;
-        }
-        case (OP_CBZ >> OPCODE_SHIFT): {
-            if (CURRENT_STATE.REGS[rd] == 0) {
-                int64_t offset = ((int64_t)addr << 2);
-                NEXT_STATE.PC += offset;
-                return;
-            }
-            break;
-        }
-        case (OP_CBNZ >> OPCODE_SHIFT): {
-            if (CURRENT_STATE.REGS[rd] != 0) {
-                int64_t offset = ((int64_t)addr << 2);
-                NEXT_STATE.PC += offset;
-                return;
-            }
-            break;
-        }
-        case (OP_LSL >> OPCODE_SHIFT): {
-            NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rn] << imm;
-            break;
-        }
-        // case (OP_LSR >> OPCODE_SHIFT): {
-        //     NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rn] >> imm;
-        //     break;
-        // }
-        case (OP_LDUR >> OPCODE_SHIFT): {
-            uint64_t address = CURRENT_STATE.REGS[rn] + (imm << 2);
-            NEXT_STATE.REGS[rd] = mem_read_32(address);
-            break;
-        }
-        case (OP_STUR >> OPCODE_SHIFT): {
-            uint64_t address = CURRENT_STATE.REGS[rn] + (imm << 2);
-            mem_write_32(address, CURRENT_STATE.REGS[rd]);
-            break;
-        }
-        case (OP_MOVZ >> OPCODE_SHIFT): {
-            NEXT_STATE.REGS[rd] = imm << (shift * 16);
-            break;
-        }
-    }
 
-    // Update PC for next instruction (unless it was already updated by a branch)
+        case INST_B_COND:
+            // Evaluar flags y actualizar PC
+            break;
+        // ... otros casos
+        case INST_HLT:
+            // Detener la simulación
+            printf("Simulación detenida por instrucción HLT\n");
+            RUN_BIT = 0; // Detener la simulación
+            break;
+        default:
+            // Instrucción no implementada
+            printf("Instrucción no implementada\n");
+            break;
+        }
+    // Actualizar PC para la siguiente instrucción
     NEXT_STATE.PC += 4;
-}
-
-// void haltear(){
-//     RUN_BIT = 0;
-// }
+    // Actualizar el estado actual
+    CURRENT_STATE = NEXT_STATE;
+        
+    }
+    // Actualizar el estado de la memoria
+    // mem_write_32(CURRENT_STATE.PC, CURRENT_STATE.REGS[0]); // Ejemplo
+    // Actualizar el estado de los registros
+    // mem_write_32(CURRENT_STATE.REGS[0], CURRENT_STATE.REGS[1]); // Ejemplo
+    // Actualizar los flags
+    // update_flags(CURRENT_STATE.REGS[0]); // Ejemplo
+    // Actualizar el estado de la memoria

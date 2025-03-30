@@ -1,0 +1,28 @@
+Instruction Name,Opcode Bits
+ADD (extended register),00010110001
+ADD (immediate),00100001
+ADDS (extended register),01010110001
+ADDS (immediate),01100001
+MUL (Multiply),011101000
+SUBS (extended register),11010110001
+SUBS (immediate),11100001
+HLT (Halt),00010000
+CMP (extended register),11010110001
+CMP (immediate),11100001
+ANDS (shifted register),1101010
+EOR (shifted register),1001010
+ORR (shifted register),0101010
+B (unconditional branch),000101
+BR (Branch to Register),1101011000, 1101011000
+LSL (immediate),100010
+LSR (immediate),100010
+STUR (Store Register),11100000
+STURB (Store Byte),011100000
+STURH (Store Halfword),111100000
+LDUR (Load Register),11100010
+LDURH (Load Halfword),11100010
+LDURB (Load Byte),011100010
+MOVZ (Move Zero),101001
+CBZ (Compare & Branch on Zero),0110100
+CBNZ (Compare & Branch on Non-Zero),0110101
+B (conditional branch),01010100

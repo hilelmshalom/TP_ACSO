@@ -150,9 +150,9 @@ make clean
 - `ORR`
 
 ### **Saltos**  
-- `B`  
-- `BR`  
-- `BEQ`, `BNE`, `BGT`, `BLT`, `BGE`, `BLE` (Condicionales)  
+- `B` 
+- `B.cond` 
+- `BR` 
 - `CBZ`, `CBNZ`
 
 ### **Desplazamientos**  
@@ -178,3 +178,50 @@ make clean
 - **La memoria comienza en `0x10000000` y tiene tamaño `0x00100000`**.  
 
 ---
+
+```
+typedef enum {
+    /* Instrucciones principales */
+    INST_ADD_REG,
+    INST_ADD_IM,
+    INST_ADDS_REG,
+    INST_ADDS_IM,
+    INST_MUL,
+    INST_SUBS_REG,
+    INST_SUBS_IM,
+    
+    /* Comparaciones (alias de SUBS) */
+    INST_CMP_REG,
+    INST_CMP_IM,
+    
+    /* Operaciones lógicas */
+    INST_ANDS,
+    INST_EOR,
+    INST_ORR,
+    
+    /* Saltos */
+    INST_B,
+    INST_BR,
+    INST_B_COND,
+    
+    /* Shifts */
+    INST_LSL,
+    INST_LSR,
+    
+    /* Load/Store */
+    INST_STUR,
+    INST_STURB,
+    INST_STURH,
+    INST_LDUR,
+    INST_LDURB,
+    INST_LDURH,
+    
+    /* Otras */
+    INST_MOVZ,
+    INST_CBZ,
+    INST_CBNZ,
+    INST_HLT,
+    
+    INST_UNKNOWN
+} InstructionType;
+```
