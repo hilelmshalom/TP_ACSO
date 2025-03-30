@@ -357,32 +357,30 @@ void process_instruction() {
             printf("@ %d : %d x %d\n", inst.Rd, inst.Rn, inst.Rm);
 
             break;
+        
+        case INST_CMP_REG:
+            printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
+            int64_t result = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
+            update_flags(result);
 
         case INST_SUBS_REG:
-            // Implementar lógica de SUBS_REG y COMP_REG
-            if (inst.Rd == 31) {
-                // Comparación
-                printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
-                int64_t result = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
-                update_flags(result);
-            } else {
-                // Resta
-                printf("Restando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
-                NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
-                update_flags(NEXT_STATE.REGS[inst.Rd]);
-            }
+            // Resta
+            printf("Restando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
+            update_flags(NEXT_STATE.REGS[inst.Rd]);
             break;
+        
+        case INST_CMP_IM:
+            // Comparación
+            printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], (inst.imm << inst.shift));
+            result = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
+            update_flags(result);
+            break;
+            
         case INST_SUBS_IM:
-            // Implementar lógica de SUBS_IM y COMP_IM
-            if (inst.Rd == 31) {
-                // Comparación
-                int64_t result = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
-                update_flags(result);
-            } else {
-                // Resta
-                NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
-                update_flags(NEXT_STATE.REGS[inst.Rd]);
-            }
+            // Resta
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
+            update_flags(NEXT_STATE.REGS[inst.Rd]);
             break;
 
         //------------------------- LÓGICAS --------------------------------
@@ -456,10 +454,10 @@ void process_instruction() {
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] >> inst.imm;
             break;
 
-        // case INST_STUR:
-        //     // STUR: M[X2 + imm] = X1
-        //     mem_write_32(0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm, CURRENT_STATE.REGS[inst.Rt]);
-        //     break;
+        case INST_STUR:
+            // STUR: M[X2 + imm] = X1
+            mem_write_32(0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm, CURRENT_STATE.REGS[inst.Rt]);
+            break;
         
         case INST_STURB:
             {
@@ -491,18 +489,53 @@ void process_instruction() {
             }
             break;
 
+        case INST_LDUR:
+            // LDUR: X1 = M[X2 + imm]
+            NEXT_STATE.REGS[inst.Rt] = mem_read_32(0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm);
+            break;
+
+        case INST_LDURB:
+            // LDURB: X1 = 56'b0, M[X2 + imm](7:0)
+            {
+                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
+                int byte_offset = address & 0x3; // Determine the byte offset within the 32-bit word
+                uint8_t byte_value = (aligned_value >> (byte_offset * 8)) & 0xFF; // Extract the byte
+                NEXT_STATE.REGS[inst.Rt] = (uint64_t)byte_value; // Zero-extend to 64 bits
+            }
+            break;
+
+        case INST_LDURH:
+            // LDURH: X1 = 48'b0, M[X2 + imm](15:0)
+            {
+                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
+                int halfword_offset = (address & 0x3) >> 1; // Determine the halfword offset (0 or 1)
+                uint16_t halfword_value = (aligned_value >> (halfword_offset * 16)) & 0xFFFF; // Extract the halfword
+                NEXT_STATE.REGS[inst.Rt] = (uint64_t)halfword_value; // Zero-extend to 64 bits
+            }
+            break;
+
         case INST_MOVZ:
             // MOVZ: Xd = imm << (shift * 16)
             NEXT_STATE.REGS[inst.Rd] = inst.imm << (inst.shift * 16);
             break;
 
+        case INST_CBZ:
+            // CBZ: Branch to label if X3 (Rt) is 0
+            if (CURRENT_STATE.REGS[inst.Rt] == 0) {
+            NEXT_STATE.PC += inst.imm;
+            }
+            break;
 
+        case INST_CBNZ:
+            // CBNZ: Branch to label if X3 (Rt) is not 0
+            if (CURRENT_STATE.REGS[inst.Rt] != 0) {
+            NEXT_STATE.PC += inst.imm;
+            }
+            break;
 
-
-
-
-
-        // HALT
+        // ----- HALT -----
         case INST_HLT:
             // Detener la simulación
             printf("Simulación detenida por instrucción HLT\n");
