@@ -13,8 +13,8 @@
 #define OP_SUBS_IMM         0xF1000000  // 11110001 (bits 31-24)
 
 /* Comparaciones (alias de SUBS) */
-#define OP_CMP_EXT_REG      OP_SUBS_EXT_REG  // Mismo opcode que SUBS_EXT_REG
-#define OP_CMP_IMM          OP_SUBS_IMM      // Mismo opcode que SUBS_IMM
+// #define OP_CMP_EXT_REG      OP_SUBS_EXT_REG  // Mismo opcode que SUBS_EXT_REG
+// #define OP_CMP_IMM          OP_SUBS_IMM      // Mismo opcode que SUBS_IMM
 
 /* Operaciones lógicas */
 #define OP_ANDS             0xEA000000  // 11101010 (bits 31-24)
@@ -60,6 +60,20 @@
 #define MASK_OP_26         0xFC000000  // bits 31-26
 #define MASK_OP_23         0xFF800000  // bits 31-23
 
+// #define COND_EQ  0x0  // Equal (Z == 1)
+// #define COND_NE  0x1  // Not Equal (Z == 0)
+// #define COND_GT  0xA  // Greater Than (Z == 0 && N == 0)
+// #define COND_LT  0xB  // Less Than (N == 1)
+// #define COND_GE  0xC  // Greater Than or Equal (N == 0)
+// #define COND_LE  0xD  // Less Than or Equal (Z == 1 || N == 1)
+
+// prueba
+#define COND_EQ  0  // Equal (Z == 1)
+#define COND_NE  1  // Not Equal (Z == 0)
+#define COND_GT  2  // Greater Than (Z == 0 && N == 0)
+#define COND_LT  3  // Less Than (N == 1)
+#define COND_GE  4  // Greater Than or Equal (N == 0)
+#define COND_LE  5  // Less Than or Equal (Z == 1 || N == 1)
 
 typedef enum {
     /* Instrucciones principales */
@@ -136,6 +150,8 @@ int32_t sign_extend(int32_t value, int bits) {
     int32_t mask = 1 << (bits - 1);
     return (value ^ mask) - mask;
 }
+
+
 
 DecodedInstruction decode_instruction(uint32_t instruction) {
     DecodedInstruction inst = {INST_UNKNOWN};
@@ -304,41 +320,189 @@ void process_instruction() {
     uint32_t instruction = mem_read_32(CURRENT_STATE.PC);
     DecodedInstruction inst = decode_instruction(instruction);
     // muestra en salida los detalles de la instrucción decodificada
-    printf("Instruction: %08X\n", instruction);
-    printf("Type: %d\n", inst.type);
-    printf("Rd: %d\n", inst.Rd);
-    printf("Rn: %d\n", inst.Rn);
-    printf("imm: %ld\n", inst.imm);
-    printf("shift: %d\n", inst.shift);
+    printf("Instruction: %08X\n", inst.type);
+
 
         switch (inst.type) {
         case INST_ADD_REG:
             // Implementar lógica de ADD_REG
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + CURRENT_STATE.REGS[inst.Rm];
-            
+            printf("@ %d : %d + %d\n", inst.Rd, inst.Rn, inst.Rm);
 
             break;
         case INST_ADD_IM:
             // Implementar lógica de ADD_IM
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + (inst.imm << inst.shift);
+            printf("@[%d] : [%d] + %ld\n", inst.Rd, inst.Rn, inst.imm);
             break;
 
         case INST_ADDS_REG:
             // Implementar lógica de ADDS_REG
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + CURRENT_STATE.REGS[inst.Rm];
             update_flags(NEXT_STATE.REGS[inst.Rd]);
+            printf("@ %d : %d + %d\n", inst.Rd, inst.Rn, inst.Rm);
             break;
 
         case INST_ADDS_IM:
             // Implementar lógica de ADDS_IM
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + (inst.imm << inst.shift);
             update_flags(NEXT_STATE.REGS[inst.Rd]);
+            printf("@[%d] : [%d] + %ld\n", inst.Rd, inst.Rn, inst.imm);
+
+            break;
+
+        case INST_MUL:
+            // Implementar lógica de MUL
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] * CURRENT_STATE.REGS[inst.Rm];
+            printf("@ %d : %d x %d\n", inst.Rd, inst.Rn, inst.Rm);
+
+            break;
+
+        case INST_SUBS_REG:
+            // Implementar lógica de SUBS_REG y COMP_REG
+            if (inst.Rd == 31) {
+                // Comparación
+                printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
+                int64_t result = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
+                update_flags(result);
+            } else {
+                // Resta
+                printf("Restando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
+                NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
+                update_flags(NEXT_STATE.REGS[inst.Rd]);
+            }
+            break;
+        case INST_SUBS_IM:
+            // Implementar lógica de SUBS_IM y COMP_IM
+            if (inst.Rd == 31) {
+                // Comparación
+                int64_t result = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
+                update_flags(result);
+            } else {
+                // Resta
+                NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
+                update_flags(NEXT_STATE.REGS[inst.Rd]);
+            }
+            break;
+
+        //------------------------- LÓGICAS --------------------------------
+        case INST_ANDS:
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] & CURRENT_STATE.REGS[inst.Rm];
+            update_flags(NEXT_STATE.REGS[inst.Rd]);
+            break;
+
+        case INST_EOR:
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] ^ CURRENT_STATE.REGS[inst.Rm];
+            break;
+
+        case INST_ORR:
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] | CURRENT_STATE.REGS[inst.Rm];
+            break;
+
+        //------------------------- SALTOS --------------------------------
+        case INST_B:
+            NEXT_STATE.PC += inst.imm;
+            break;
+        
+        case INST_BR:
+            NEXT_STATE.PC = CURRENT_STATE.REGS[inst.Rn];
             break;
 
         case INST_B_COND:
-            // Evaluar flags y actualizar PC
+            // Evaluate condition and update PC
+            switch (inst.cond) {
+                case COND_EQ: // BEQ (Branch if Equal)
+                    if (CURRENT_STATE.FLAG_Z) { // Z flag is set
+                        NEXT_STATE.PC += inst.imm;
+                    }
+                    break;
+                case COND_NE: // BNE (Branch if Not Equal)
+                    if (!CURRENT_STATE.FLAG_Z) { // Z flag is not set
+                        NEXT_STATE.PC += inst.imm;
+                    }
+                    break;
+                case COND_GT: // BGT (Branch if Greater Than)
+                    if (!CURRENT_STATE.FLAG_Z && !CURRENT_STATE.FLAG_N) { // Z=0 and N=0
+                        NEXT_STATE.PC += inst.imm;
+                    }
+                    break;
+                case COND_LT: // BLT (Branch if Less Than)
+                    if (CURRENT_STATE.FLAG_N) { // N flag is set
+                        NEXT_STATE.PC += inst.imm;
+                    }
+                    break;
+                case COND_GE: // BGE (Branch if Greater Than or Equal)
+                    if (!CURRENT_STATE.FLAG_N) { // N=0
+                        NEXT_STATE.PC += inst.imm;
+                    }
+                    break;
+                case COND_LE: // BLE (Branch if Less Than or Equal)
+                    if (CURRENT_STATE.FLAG_Z || CURRENT_STATE.FLAG_N) { // Z=1 or N=1
+                        NEXT_STATE.PC += inst.imm;
+                    }
+                    break;
+                default:
+                    printf("Unknown condition code: %u\n", inst.cond);
+                    break;
+            }
             break;
-        // ... otros casos
+
+        //------------------------- LOAD/STORE ------------------------------
+        case INST_LSL:
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] << inst.imm;
+            break;
+
+        case INST_LSR:
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] >> inst.imm;
+            break;
+
+        // case INST_STUR:
+        //     // STUR: M[X2 + imm] = X1
+        //     mem_write_32(0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm, CURRENT_STATE.REGS[inst.Rt]);
+        //     break;
+        
+        case INST_STURB:
+            {
+                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
+                uint8_t byte_value = CURRENT_STATE.REGS[inst.Rt] & 0xFF; // Extract the least significant 8 bits
+                int byte_offset = address & 0x3; // Determine the byte offset within the 32-bit word
+
+                // Insert the byte into the correct position
+                aligned_value &= ~(0xFF << (byte_offset * 8)); // Clear the target byte
+                aligned_value |= (byte_value << (byte_offset * 8)); // Set the target byte
+
+                mem_write_32(address & ~0x3, aligned_value); // Write back the modified 32-bit word
+            }
+            break;
+
+        case INST_STURH:
+            {
+                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
+                uint16_t halfword_value = CURRENT_STATE.REGS[inst.Rt] & 0xFFFF; // Extract the least significant 16 bits
+                int halfword_offset = (address & 0x3) >> 1; // Determine the halfword offset (0 or 1)
+
+                // Insert the halfword into the correct position
+                aligned_value &= ~(0xFFFF << (halfword_offset * 16)); // Clear the target halfword
+                aligned_value |= (halfword_value << (halfword_offset * 16)); // Set the target halfword
+
+                mem_write_32(address & ~0x3, aligned_value); // Write back the modified 32-bit word
+            }
+            break;
+
+        case INST_MOVZ:
+            // MOVZ: Xd = imm << (shift * 16)
+            NEXT_STATE.REGS[inst.Rd] = inst.imm << (inst.shift * 16);
+            break;
+
+
+
+
+
+
+
+        // HALT
         case INST_HLT:
             // Detener la simulación
             printf("Simulación detenida por instrucción HLT\n");
