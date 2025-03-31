@@ -62,12 +62,12 @@
 #define MASK_OP_22         0xFFC00000  // bits 31-22
 
 // prueba
-#define COND_EQ  0x0  // Equal (Z == 1)
-#define COND_NE  0x1  // Not Equal (Z == 0)
-#define COND_GT  0xA  // Greater Than (Z == 0 && N == 0)
-#define COND_LT  0xB  // Less Than (N == 1)
-#define COND_GE  0xC  // Greater Than or Equal (N == 0)
-#define COND_LE  0xD  // Less Than or Equal (Z == 1 || N == 1)
+#define COND_EQ  0x0  // 
+#define COND_NE  0x1  // 
+#define COND_GE  0xA  // 
+#define COND_LT  0xB  // 
+#define COND_GT  0xC  // 
+#define COND_LE  0xD  // 
 
 typedef enum {
     /* Instrucciones principales */
