@@ -222,7 +222,7 @@ DecodedInstruction decode_instruction(uint32_t instruction) {
     else if ((instruction & MASK_OP_26) == OP_B) {
         inst.type = INST_B;
         inst.imm = (instruction & MASK_B_IMM26) << 2;
-        inst.imm = sign_extend(inst.imm, 28);  // Sign-extend para saltos relativos
+        inst.imm = sign_extend(inst.imm, 28); 
     }
     else if ((instruction & MASK_OP_21) == OP_BR) {
         inst.type = INST_BR;
@@ -232,7 +232,7 @@ DecodedInstruction decode_instruction(uint32_t instruction) {
         inst.type = INST_B_COND;
         inst.cond = instruction & 0x0F;
         inst.imm = (instruction & MASK_B_COND_IMM19) >> 5;
-        inst.imm = sign_extend(inst.imm << 2, 21);  // Sign-extend de 21 bits
+        inst.imm = sign_extend(inst.imm << 2, 21); 
     }
     //───────────────────────────── LOAD/STORE ─────────────────────────────
     else if ((instruction & MASK_OP_21) == OP_STUR) {
@@ -294,7 +294,7 @@ DecodedInstruction decode_instruction(uint32_t instruction) {
         inst.type = INST_CBZ;
         inst.Rt = instruction & MASK_REG_RD;
         //inst.imm = (instruction >> 5) & 0x7FFFF;
-        inst.imm = sign_extend((instruction >> 5) & 0x7FFFF, 21) << 2; // Corrección aquí
+        inst.imm = sign_extend((instruction >> 5) & 0x7FFFF, 21) << 2;
 
     }
 
@@ -302,13 +302,11 @@ DecodedInstruction decode_instruction(uint32_t instruction) {
         inst.type = INST_CBNZ;
         inst.Rt = instruction & MASK_REG_RD;
         //inst.imm = (instruction >> 5) & 0x7FFFF;
-        inst.imm = sign_extend((instruction >> 5) & 0x7FFFF, 21) << 2; // Y aquí
+        inst.imm = sign_extend((instruction >> 5) & 0x7FFFF, 21) << 2;
 
     }
     else {
         inst.type = INST_UNKNOWN;
-        // printf("La instruccion luego de aplicar mask_op_22 es: %08X\n", instruction & MASK_OP_22);
-        printf("Instrucción desconocida: %08X\n", instruction);
     }
     return inst;
 }
@@ -316,62 +314,47 @@ DecodedInstruction decode_instruction(uint32_t instruction) {
 void process_instruction() {
     uint32_t instruction = mem_read_32(CURRENT_STATE.PC);
     DecodedInstruction inst = decode_instruction(instruction);
-    // muestra en salida los detalles de la instrucción decodificada
-    printf("Instruction: %d\n", inst.type);
- 
-    printf("Program Counter: %08lX\n", CURRENT_STATE.PC);
 
         switch (inst.type) {
         case INST_ADD_REG:
             // Implementar lógica de ADD_REG
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + CURRENT_STATE.REGS[inst.Rm];
-            printf("@ %d : %d + %d\n", inst.Rd, inst.Rn, inst.Rm);
-
             break;
+
         case INST_ADD_IM:
             // Implementar lógica de ADD_IM
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + (inst.imm << inst.shift);
-            printf("@[%d] : [%d] + %ld\n", inst.Rd, inst.Rn, inst.imm);
-            break;
 
+            break;
         case INST_ADDS_REG:
             // Implementar lógica de ADDS_REG
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + CURRENT_STATE.REGS[inst.Rm];
             update_flags(NEXT_STATE.REGS[inst.Rd]);
-            printf("@ %d : %d + %d\n", inst.Rd, inst.Rn, inst.Rm);
             break;
 
         case INST_ADDS_IM:
             // Implementar lógica de ADDS_IM
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] + (inst.imm << inst.shift);
             update_flags(NEXT_STATE.REGS[inst.Rd]);
-            printf("@[%d] : [%d] + %ld\n", inst.Rd, inst.Rn, inst.imm);
 
             break;
 
         case INST_MUL:
             // Implementar lógica de MUL
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] * CURRENT_STATE.REGS[inst.Rm];
-            printf("@ %d : %d x %d\n", inst.Rd, inst.Rn, inst.Rm);
-
             break;
         
         case INST_CMP_REG:
-            printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
             int64_t result = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
             update_flags(result);
             break;
 
         case INST_SUBS_REG:
-            // Resta
-            printf("Restando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
             update_flags(NEXT_STATE.REGS[inst.Rd]);
             break;
         
         case INST_CMP_IM:
-            // Comparación
-            printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], (inst.imm << inst.shift));
             result = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
             update_flags(result);
             break;
@@ -407,12 +390,10 @@ void process_instruction() {
 
         case INST_B_COND:
             // Evaluate condition and update PC
-            printf("Teoria desde %08lX hacia %08lX\n", CURRENT_STATE.PC, CURRENT_STATE.PC + inst.imm);
             switch (inst.cond) {
                 case COND_EQ: // BEQ (Branch if Equal)
                     if (CURRENT_STATE.FLAG_Z) { // Z flag is set
                         NEXT_STATE.PC += inst.imm - 4;
-                        printf("Reducido %08lX\n", NEXT_STATE.PC);
                     }
                     break;
                 case COND_NE: // BNE (Branch if Not Equal)
@@ -441,20 +422,17 @@ void process_instruction() {
                     }
                     break;
                 default:
-                    printf("Unknown condition code: %u\n", inst.cond);
                     break;
             }
             break;
 
         //------------------------- LOAD/STORE ------------------------------
         case INST_LSL:
-            printf("LSL: imm = %ld\n", inst.imm);
             uint32_t el_verdadero_imm = 64 - inst.imm; 
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] << el_verdadero_imm;
             break;
 
         case INST_LSR:
-            printf("LSR: imm = %ld\n", inst.imm);
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] >> inst.imm;
             break;
 
@@ -465,7 +443,6 @@ void process_instruction() {
             // Little-endian: Escribir los 64 bits en dos palabras de 32
             mem_write_32(address, (uint32_t)(value & 0xFFFFFFFF));          // Lower 32 bits
             mem_write_32(address + 4, (uint32_t)((value >> 32) & 0xFFFFFFFF)); // Upper 32 bits
-            printf("STUR: [0x%08lX] <- 0x%016lX\n", address, value);
             break;
         }
         
@@ -480,8 +457,6 @@ void process_instruction() {
             new_word |= (byte << ((address % 4) * 8));
             
             mem_write_32(aligned_addr, new_word);
-            printf("STURB: [0x%08lX]@%d <- 0x%02X\n", 
-                    aligned_addr, (int)(address % 4), byte);
             break;
         }
         
@@ -497,8 +472,6 @@ void process_instruction() {
             new_word |= (halfword << shift);
             
             mem_write_32(aligned_addr, new_word);
-            printf("STURH: [0x%08lX]@%d <- 0x%04X\n", 
-                    aligned_addr, (int)(address % 4)/2, halfword);
             break;
         }
         
@@ -509,7 +482,6 @@ void process_instruction() {
             uint32_t lower = mem_read_32(address);
             uint32_t upper = mem_read_32(address + 4);
             NEXT_STATE.REGS[inst.Rt] = ((uint64_t)upper << 32) | lower;
-            printf("LDUR: X%d = 0x%016lX\n", inst.Rt, NEXT_STATE.REGS[inst.Rt]);
             break;
         }
         
@@ -521,7 +493,6 @@ void process_instruction() {
             uint32_t word = mem_read_32(aligned_addr);
             uint8_t byte = (word >> ((address % 4) * 8)) & 0xFF;
             NEXT_STATE.REGS[inst.Rt] = (uint64_t)byte;
-            printf("LDURB: X%d = 0x%02X\n", inst.Rt, byte);
             break;
         }
         
@@ -533,7 +504,6 @@ void process_instruction() {
             uint32_t word = mem_read_32(aligned_addr);
             uint16_t halfword = (word >> (((address % 4)/2) * 16)) & 0xFFFF;
             NEXT_STATE.REGS[inst.Rt] = (uint64_t)halfword;
-            printf("LDURH: X%d = 0x%04X\n", inst.Rt, halfword);
             break;
         }
 
@@ -545,45 +515,28 @@ void process_instruction() {
         case INST_CBZ:
             // CBZ: Branch to label if X3 (Rt) is 0
             if (CURRENT_STATE.REGS[inst.Rt] == 0) {
-                printf("Teoria desde %08lX hacia %08lX\n", CURRENT_STATE.PC, CURRENT_STATE.PC + inst.imm);
                 NEXT_STATE.PC += inst.imm - 4;
-                printf("Reducido %08lX\n", NEXT_STATE.PC);
             }
             break;
 
         case INST_CBNZ:
             // CBNZ: Branch to label if X3 (Rt) is not 0
             if (CURRENT_STATE.REGS[inst.Rt] != 0) {
-                printf("Teoria desde %08lX hacia %08lX\n", CURRENT_STATE.PC, CURRENT_STATE.PC + inst.imm);
 
                 NEXT_STATE.PC += inst.imm - 4;
-                printf("Reducido %08lX\n", NEXT_STATE.PC);
             }
             break;
 
         // ----- HALT -----
         case INST_HLT:
-            // Detener la simulación
-            printf("Simulación detenida por instrucción HLT\n");
-            RUN_BIT = 0; // Detener la simulación
+            // halteala
+            RUN_BIT = 0;
             break;
         default:
-            // Instrucción no implementada
-            printf("Instrucción no implementada\n");
             break;
         }
     // Actualizar PC para la siguiente instrucción
     NEXT_STATE.PC += 4;
-    // Actualizar el estado actual
-    printf("Aumentado: %08lX\n", NEXT_STATE.PC);
     CURRENT_STATE = NEXT_STATE;
-    printf("----------------------\n");
         
     }
-    // Actualizar el estado de la memoria
-    // mem_write_32(CURRENT_STATE.PC, CURRENT_STATE.REGS[0]); // Ejemplo
-    // Actualizar el estado de los registros
-    // mem_write_32(CURRENT_STATE.REGS[0], CURRENT_STATE.REGS[1]); // Ejemplo
-    // Actualizar los flags
-    // update_flags(CURRENT_STATE.REGS[0]); // Ejemplo
-    // Actualizar el estado de la memoria
