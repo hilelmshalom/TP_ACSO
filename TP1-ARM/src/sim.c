@@ -381,11 +381,11 @@ void process_instruction() {
 
         //------------------------- SALTOS --------------------------------
         case INST_B:
-            NEXT_STATE.PC += inst.imm;
+            NEXT_STATE.PC += inst.imm-4;
             break;
         
         case INST_BR:
-            NEXT_STATE.PC = CURRENT_STATE.REGS[inst.Rn];
+            NEXT_STATE.PC = CURRENT_STATE.REGS[inst.Rn]-4;
             break;
 
         case INST_B_COND:
