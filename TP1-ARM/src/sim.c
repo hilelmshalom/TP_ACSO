@@ -27,8 +27,8 @@
 #define OP_B_COND           0x54000000  // 01010100 (bits 31-24)
 
 /* Shifts */
-#define OP_LSL              0xD3400000  // 110100110 (bits 31-23) + N=0
-#define OP_LSR              0xD3400000  // 110100110 (bits 31-23) + N=1
+#define OP_LSL              0xD3400000  // 110100110 (bits 31-22) + N=1
+#define OP_LSR              0xD3400000  // 110100110 (bits 31-22) + N=1
 
 /* Load/Store */
 #define OP_STUR             0xF8000000  // 11111000000 (bits 31-21)
@@ -59,21 +59,15 @@
 #define MASK_OP_24         0xFF000000  // bits 31-24
 #define MASK_OP_26         0xFC000000  // bits 31-26
 #define MASK_OP_23         0xFF800000  // bits 31-23
-
-// #define COND_EQ  0x0  // Equal (Z == 1)
-// #define COND_NE  0x1  // Not Equal (Z == 0)
-// #define COND_GT  0xA  // Greater Than (Z == 0 && N == 0)
-// #define COND_LT  0xB  // Less Than (N == 1)
-// #define COND_GE  0xC  // Greater Than or Equal (N == 0)
-// #define COND_LE  0xD  // Less Than or Equal (Z == 1 || N == 1)
+#define MASK_OP_22         0xFFC00000  // bits 31-22
 
 // prueba
-#define COND_EQ  0  // Equal (Z == 1)
-#define COND_NE  1  // Not Equal (Z == 0)
-#define COND_GT  2  // Greater Than (Z == 0 && N == 0)
-#define COND_LT  3  // Less Than (N == 1)
-#define COND_GE  4  // Greater Than or Equal (N == 0)
-#define COND_LE  5  // Less Than or Equal (Z == 1 || N == 1)
+#define COND_EQ  0x0  // Equal (Z == 1)
+#define COND_NE  0x1  // Not Equal (Z == 0)
+#define COND_GT  0xA  // Greater Than (Z == 0 && N == 0)
+#define COND_LT  0xB  // Less Than (N == 1)
+#define COND_GE  0xC  // Greater Than or Equal (N == 0)
+#define COND_LE  0xD  // Less Than or Equal (Z == 1 || N == 1)
 
 typedef enum {
     /* Instrucciones principales */
@@ -284,33 +278,36 @@ DecodedInstruction decode_instruction(uint32_t instruction) {
         inst.Rd = instruction & MASK_REG_RD;
         inst.imm = (instruction >> 5) & 0xFFFF;
     }
-    else if ((instruction & MASK_OP_23) == OP_LSL) {
-        inst.type = INST_LSL;
+    else if ((instruction & MASK_OP_22) == OP_LSL) {
+        
+        if (((instruction >> 10) & 0x3F) == 63) {
+            inst.type = INST_LSR;
+        } else {
+            inst.type = INST_LSL;
+        }
         inst.Rd = instruction & MASK_REG_RD;
         inst.Rn = (instruction & MASK_REG_RN) >> 5;
-        inst.imm = (instruction >> 10) & 0x3F;
-    }
-    else if ((instruction & MASK_OP_23) == OP_LSR) {
-        inst.type = INST_LSR;
-        inst.Rd = instruction & MASK_REG_RD;
-        inst.Rn = (instruction & MASK_REG_RN) >> 5;
-        inst.imm = (instruction >> 10) & 0x3F;
-    }
-
+        inst.imm = (instruction >> 16) & 0x3F;
+        }
 
     else if ((instruction & MASK_OP_24) == OP_CBZ) {
         inst.type = INST_CBZ;
         inst.Rt = instruction & MASK_REG_RD;
-        inst.imm = (instruction >> 5) & 0x7FFFF;
+        //inst.imm = (instruction >> 5) & 0x7FFFF;
+        inst.imm = sign_extend((instruction >> 5) & 0x7FFFF, 21) << 2; // Corrección aquí
+
     }
 
     else if ((instruction & MASK_OP_24) == OP_CBNZ) {
         inst.type = INST_CBNZ;
         inst.Rt = instruction & MASK_REG_RD;
-        inst.imm = (instruction >> 5) & 0x7FFFF;
+        //inst.imm = (instruction >> 5) & 0x7FFFF;
+        inst.imm = sign_extend((instruction >> 5) & 0x7FFFF, 21) << 2; // Y aquí
+
     }
     else {
         inst.type = INST_UNKNOWN;
+        // printf("La instruccion luego de aplicar mask_op_22 es: %08X\n", instruction & MASK_OP_22);
         printf("Instrucción desconocida: %08X\n", instruction);
     }
     return inst;
@@ -320,8 +317,9 @@ void process_instruction() {
     uint32_t instruction = mem_read_32(CURRENT_STATE.PC);
     DecodedInstruction inst = decode_instruction(instruction);
     // muestra en salida los detalles de la instrucción decodificada
-    printf("Instruction: %08X\n", inst.type);
-
+    printf("Instruction: %d\n", inst.type);
+ 
+    printf("Program Counter: %08lX\n", CURRENT_STATE.PC);
 
         switch (inst.type) {
         case INST_ADD_REG:
@@ -362,6 +360,7 @@ void process_instruction() {
             printf("Comparando %ld - %ld\n", CURRENT_STATE.REGS[inst.Rn], CURRENT_STATE.REGS[inst.Rm]);
             int64_t result = CURRENT_STATE.REGS[inst.Rn] - CURRENT_STATE.REGS[inst.Rm];
             update_flags(result);
+            break;
 
         case INST_SUBS_REG:
             // Resta
@@ -376,7 +375,7 @@ void process_instruction() {
             result = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
             update_flags(result);
             break;
-            
+
         case INST_SUBS_IM:
             // Resta
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] - (inst.imm << inst.shift);
@@ -408,35 +407,37 @@ void process_instruction() {
 
         case INST_B_COND:
             // Evaluate condition and update PC
+            printf("Teoria desde %08lX hacia %08lX\n", CURRENT_STATE.PC, CURRENT_STATE.PC + inst.imm);
             switch (inst.cond) {
                 case COND_EQ: // BEQ (Branch if Equal)
                     if (CURRENT_STATE.FLAG_Z) { // Z flag is set
-                        NEXT_STATE.PC += inst.imm;
+                        NEXT_STATE.PC += inst.imm - 4;
+                        printf("Reducido %08lX\n", NEXT_STATE.PC);
                     }
                     break;
                 case COND_NE: // BNE (Branch if Not Equal)
                     if (!CURRENT_STATE.FLAG_Z) { // Z flag is not set
-                        NEXT_STATE.PC += inst.imm;
+                        NEXT_STATE.PC += inst.imm -4;
                     }
                     break;
                 case COND_GT: // BGT (Branch if Greater Than)
                     if (!CURRENT_STATE.FLAG_Z && !CURRENT_STATE.FLAG_N) { // Z=0 and N=0
-                        NEXT_STATE.PC += inst.imm;
+                        NEXT_STATE.PC += inst.imm -4;
                     }
                     break;
                 case COND_LT: // BLT (Branch if Less Than)
                     if (CURRENT_STATE.FLAG_N) { // N flag is set
-                        NEXT_STATE.PC += inst.imm;
+                        NEXT_STATE.PC += inst.imm -4;
                     }
                     break;
                 case COND_GE: // BGE (Branch if Greater Than or Equal)
                     if (!CURRENT_STATE.FLAG_N) { // N=0
-                        NEXT_STATE.PC += inst.imm;
+                        NEXT_STATE.PC += inst.imm -4;
                     }
                     break;
                 case COND_LE: // BLE (Branch if Less Than or Equal)
                     if (CURRENT_STATE.FLAG_Z || CURRENT_STATE.FLAG_N) { // Z=1 or N=1
-                        NEXT_STATE.PC += inst.imm;
+                        NEXT_STATE.PC += inst.imm -4;
                     }
                     break;
                 default:
@@ -447,91 +448,116 @@ void process_instruction() {
 
         //------------------------- LOAD/STORE ------------------------------
         case INST_LSL:
-            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] << inst.imm;
+            printf("LSL: imm = %ld\n", inst.imm);
+            uint32_t el_verdadero_imm = 64 - inst.imm; 
+            NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] << el_verdadero_imm;
             break;
 
         case INST_LSR:
+            printf("LSR: imm = %ld\n", inst.imm);
             NEXT_STATE.REGS[inst.Rd] = CURRENT_STATE.REGS[inst.Rn] >> inst.imm;
             break;
 
-        case INST_STUR:
-            // STUR: M[X2 + imm] = X1
-            mem_write_32(0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm, CURRENT_STATE.REGS[inst.Rt]);
+        case INST_STUR: {
+            uint64_t address = CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+            uint64_t value = CURRENT_STATE.REGS[inst.Rt];
+            
+            // Little-endian: Escribir los 64 bits en dos palabras de 32
+            mem_write_32(address, (uint32_t)(value & 0xFFFFFFFF));          // Lower 32 bits
+            mem_write_32(address + 4, (uint32_t)((value >> 32) & 0xFFFFFFFF)); // Upper 32 bits
+            printf("STUR: [0x%08lX] <- 0x%016lX\n", address, value);
             break;
+        }
         
-        case INST_STURB:
-            {
-                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
-                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
-                uint8_t byte_value = CURRENT_STATE.REGS[inst.Rt] & 0xFF; // Extract the least significant 8 bits
-                int byte_offset = address & 0x3; // Determine the byte offset within the 32-bit word
-
-                // Insert the byte into the correct position
-                aligned_value &= ~(0xFF << (byte_offset * 8)); // Clear the target byte
-                aligned_value |= (byte_value << (byte_offset * 8)); // Set the target byte
-
-                mem_write_32(address & ~0x3, aligned_value); // Write back the modified 32-bit word
-            }
+        case INST_STURB: {
+            uint64_t address = CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+            uint8_t byte = CURRENT_STATE.REGS[inst.Rt] & 0xFF;
+            
+            // Little-endian: byte en posición (address % 4)
+            uint64_t aligned_addr = address & ~0x3;
+            uint32_t current_word = mem_read_32(aligned_addr);
+            uint32_t new_word = current_word & ~(0xFF << ((address % 4) * 8));
+            new_word |= (byte << ((address % 4) * 8));
+            
+            mem_write_32(aligned_addr, new_word);
+            printf("STURB: [0x%08lX]@%d <- 0x%02X\n", 
+                    aligned_addr, (int)(address % 4), byte);
             break;
-
-        case INST_STURH:
-            {
-                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
-                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
-                uint16_t halfword_value = CURRENT_STATE.REGS[inst.Rt] & 0xFFFF; // Extract the least significant 16 bits
-                int halfword_offset = (address & 0x3) >> 1; // Determine the halfword offset (0 or 1)
-
-                // Insert the halfword into the correct position
-                aligned_value &= ~(0xFFFF << (halfword_offset * 16)); // Clear the target halfword
-                aligned_value |= (halfword_value << (halfword_offset * 16)); // Set the target halfword
-
-                mem_write_32(address & ~0x3, aligned_value); // Write back the modified 32-bit word
-            }
+        }
+        
+        case INST_STURH: {
+            uint64_t address = CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+            uint16_t halfword = CURRENT_STATE.REGS[inst.Rt] & 0xFFFF;
+            
+            // Little-endian: halfword en posición (address % 4) / 2
+            uint64_t aligned_addr = address & ~0x3;
+            uint32_t current_word = mem_read_32(aligned_addr);
+            uint32_t shift = ((address % 4) / 2) * 16;
+            uint32_t new_word = current_word & ~(0xFFFF << shift);
+            new_word |= (halfword << shift);
+            
+            mem_write_32(aligned_addr, new_word);
+            printf("STURH: [0x%08lX]@%d <- 0x%04X\n", 
+                    aligned_addr, (int)(address % 4)/2, halfword);
             break;
-
-        case INST_LDUR:
-            // LDUR: X1 = M[X2 + imm]
-            NEXT_STATE.REGS[inst.Rt] = mem_read_32(0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm);
+        }
+        
+        case INST_LDUR: {
+            uint64_t address = CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+            
+            // Little-endian: Leer dos palabras y combinar
+            uint32_t lower = mem_read_32(address);
+            uint32_t upper = mem_read_32(address + 4);
+            NEXT_STATE.REGS[inst.Rt] = ((uint64_t)upper << 32) | lower;
+            printf("LDUR: X%d = 0x%016lX\n", inst.Rt, NEXT_STATE.REGS[inst.Rt]);
             break;
-
-        case INST_LDURB:
-            // LDURB: X1 = 56'b0, M[X2 + imm](7:0)
-            {
-                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
-                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
-                int byte_offset = address & 0x3; // Determine the byte offset within the 32-bit word
-                uint8_t byte_value = (aligned_value >> (byte_offset * 8)) & 0xFF; // Extract the byte
-                NEXT_STATE.REGS[inst.Rt] = (uint64_t)byte_value; // Zero-extend to 64 bits
-            }
+        }
+        
+        case INST_LDURB: {
+            uint64_t address = CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+            
+            // Little-endian: Extraer byte de la posición correcta
+            uint64_t aligned_addr = address & ~0x3;
+            uint32_t word = mem_read_32(aligned_addr);
+            uint8_t byte = (word >> ((address % 4) * 8)) & 0xFF;
+            NEXT_STATE.REGS[inst.Rt] = (uint64_t)byte;
+            printf("LDURB: X%d = 0x%02X\n", inst.Rt, byte);
             break;
-
-        case INST_LDURH:
-            // LDURH: X1 = 48'b0, M[X2 + imm](15:0)
-            {
-                uint32_t address = 0x10000000 + CURRENT_STATE.REGS[inst.Rn] + inst.imm;
-                uint32_t aligned_value = mem_read_32(address & ~0x3); // Read the aligned 32-bit word
-                int halfword_offset = (address & 0x3) >> 1; // Determine the halfword offset (0 or 1)
-                uint16_t halfword_value = (aligned_value >> (halfword_offset * 16)) & 0xFFFF; // Extract the halfword
-                NEXT_STATE.REGS[inst.Rt] = (uint64_t)halfword_value; // Zero-extend to 64 bits
-            }
+        }
+        
+        case INST_LDURH: {
+            uint64_t address = CURRENT_STATE.REGS[inst.Rn] + inst.imm;
+            
+            // Little-endian: Extraer halfword de la posición correcta
+            uint64_t aligned_addr = address & ~0x3;
+            uint32_t word = mem_read_32(aligned_addr);
+            uint16_t halfword = (word >> (((address % 4)/2) * 16)) & 0xFFFF;
+            NEXT_STATE.REGS[inst.Rt] = (uint64_t)halfword;
+            printf("LDURH: X%d = 0x%04X\n", inst.Rt, halfword);
             break;
+        }
 
         case INST_MOVZ:
             // MOVZ: Xd = imm << (shift * 16)
-            NEXT_STATE.REGS[inst.Rd] = inst.imm << (inst.shift * 16);
+            NEXT_STATE.REGS[inst.Rd] = inst.imm;
             break;
 
         case INST_CBZ:
             // CBZ: Branch to label if X3 (Rt) is 0
             if (CURRENT_STATE.REGS[inst.Rt] == 0) {
-            NEXT_STATE.PC += inst.imm;
+                printf("Teoria desde %08lX hacia %08lX\n", CURRENT_STATE.PC, CURRENT_STATE.PC + inst.imm);
+                NEXT_STATE.PC += inst.imm - 4;
+                printf("Reducido %08lX\n", NEXT_STATE.PC);
             }
             break;
 
         case INST_CBNZ:
             // CBNZ: Branch to label if X3 (Rt) is not 0
             if (CURRENT_STATE.REGS[inst.Rt] != 0) {
-            NEXT_STATE.PC += inst.imm;
+                printf("Teoria desde %08lX hacia %08lX\n", CURRENT_STATE.PC, CURRENT_STATE.PC + inst.imm);
+
+                NEXT_STATE.PC += inst.imm - 4;
+                printf("Reducido %08lX\n", NEXT_STATE.PC);
             }
             break;
 
@@ -549,7 +575,9 @@ void process_instruction() {
     // Actualizar PC para la siguiente instrucción
     NEXT_STATE.PC += 4;
     // Actualizar el estado actual
+    printf("Aumentado: %08lX\n", NEXT_STATE.PC);
     CURRENT_STATE = NEXT_STATE;
+    printf("----------------------\n");
         
     }
     // Actualizar el estado de la memoria
