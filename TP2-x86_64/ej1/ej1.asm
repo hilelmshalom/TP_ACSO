@@ -20,17 +20,6 @@ extern strcmp
 
 
 string_proc_list_create_asm:
-    push rbp
-    mov rbp, rsp
-    mov rdi, 16          ; sizeof(string_proc_list) = 16 bytes (two pointers)
-    call malloc
-    test rax, rax
-    jz .end
-    mov qword [rax], 0   ; first = NULL
-    mov qword [rax+8], 0 ; last = NULL
-.end:
-    leave
-    ret
 
 string_proc_node_create_asm:
     push rbp
