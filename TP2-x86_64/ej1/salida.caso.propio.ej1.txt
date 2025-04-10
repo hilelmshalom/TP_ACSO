@@ -70,12 +70,12 @@ List length: 28
 
 Agregando constelaciones y misiones:
 
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
-geminisjunta-constelaciones-mision-estrellas:
+junta-constelaciones-mision-estrellas:librarigelcruxlibrajunodenebaurigalunadionelunaisspalas
+junta-constelaciones-mision-estrellas:aurigabetelgeusecentaurojunopolluxadharabetelgeusesiriogeminisorioncentaurobetelgeusesiriocefeosagitariocisneganimedesoberontitaniaeris
+junta-constelaciones-mision-estrellas:solcisnepavocefeopavopisiscefeosagitariopavocruxrheaencéladovesta
+junta-constelaciones-mision-estrellas:cruxpolluxaurigaaurigasagitariohubblelibraaurigacisnelibralunatitanmimastitánapollo 11cassini-huygensceresirisjunohebe
+junta-constelaciones-mision-estrellas:pavodenebadharaorionsolprocyonlibracisnepavocisneorioncentaurogeminissolpolarisrigelpavoarielhubblejunochandrayaan-2victoria
+junta-constelaciones-mision-estrellas:geminispisiscefeopolarishubblehubblepolluxcruxcalistotritónmirandaartemispallas
+junta-constelaciones-mision-estrellas:sagitariorigelsiriodenebachenarpisissagitariopavojunoadharasoyuzhygiea
+junta-constelaciones-mision-estrellas:pavopolarisaltaircefeopavocruxpavoioeuropaumbrielgalemede
 ======================== Fin del test 1b =======================
