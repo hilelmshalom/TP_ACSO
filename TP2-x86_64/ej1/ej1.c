@@ -82,7 +82,8 @@ void string_proc_node_destroy(string_proc_node* node){
 	node->next      = NULL;
 	node->previous	= NULL;
 	node->hash		= NULL;
-	node->type      = 0;			
+	node->type      = 0;	
+    free(node->hash); // ¡Liberar el string copiado!		
 	free(node);
 }
 

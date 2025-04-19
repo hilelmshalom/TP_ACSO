@@ -1335,7 +1335,7 @@ Disassembly of section .text:
   402079:	48 89 df             	mov    rdi,rbx
   40207c:	b8 00 00 00 00       	mov    eax,0x0
   402081:	e8 aa 54 00 00       	call   407530 <__isoc99_sscanf>
-  402086:	83 f8 02             	cmp    eax,0x2
+  402086:	83 f8 02             	cmp    eax,0x2 # comp
   402089:	0f 85 8c 00 00 00    	jne    40211b <phase_3+0xdf>
   40208f:	48 8d 7c 24 10       	lea    rdi,[rsp+0x10]
   402094:	e8 25 fe ff ff       	call   401ebe <readlines>
