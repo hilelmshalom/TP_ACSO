@@ -1,0 +1,5 @@
+Disk -i is 10240000 bytes (10000 KB)
+Superblock s_isize 16
+Superblock s_fsize 20000
+Superblock s_nfree 89
+Superblock s_ninode 0
