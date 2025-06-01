@@ -4,45 +4,55 @@
 #include <sys/wait.h>
 #include <string.h>
 
-#define MAX_COMMANDS 200 // Maximum number of commands in a pipeline
-#define MAX_ARGS 64      // Maximum number of arguments for a single command
+#define MAX_COMMANDS 200
+#define MAX_ARGS 64
 
 int main() {
-    char command[256];         // Buffer for the raw input line
-    char *commands[MAX_COMMANDS]; // Array to store pointers to command segments (separated by '|')
-    
-    while (1) {
-        int command_count = 0; // Reset count for each new input line
 
+    char command[256];
+    char *commands[MAX_COMMANDS];
+    int command_count = 0;
+
+    while (1) 
+    {
         printf("Shell> ");
-        fflush(stdout); // Ensure prompt is displayed before fgets
-
-        // Reads a line of input from the user
-        if (fgets(command, sizeof(command), stdin) == NULL) {
-            // Handle EOF (Ctrl+D)
+        fflush(stdout);
+        
+        /*Reads a line of input from the user from the standard input (stdin) and stores it in the variable command */
+        if(fgets(command, sizeof(command), stdin) == NULL) 
+        {
+            /* If fgets() returns NULL, it indicates an error or end-of-file (EOF). 
+               In this case, the shell will exit gracefully. */
             printf("\nExiting Shell.\n");
             break; 
         }
-
-        // Removes the newline character (\n) from the end of the string
+        
+        /* Removes the newline character (\n) from the end of the string stored in command, if present. 
+           This is done by replacing the newline character with the null character ('\0').
+           The strcspn() function returns the length of the initial segment of command that consists of 
+           characters not in the string specified in the second argument ("\n" in this case). */
         command[strcspn(command, "\n")] = '\0';
-
         // Handle empty command
         if (command[0] == '\0') {
             continue;
         }
 
-        // Tokenizes the command string using the pipe character (|) as a delimiter.
+
+        /* Tokenizes the command string using the pipe character (|) as a delimiter using the strtok() function. 
+           Each resulting token is stored in the commands[] array. 
+           The strtok() function breaks the command string into tokens (substrings) separated by the pipe character |. 
+           In each iteration of the while loop, strtok() returns the next token found in command. 
+           The tokens are stored in the commands[] array, and command_count is incremented to keep track of the number of tokens found. */
         char *token = strtok(command, "|");
-        while (token != NULL && command_count < MAX_COMMANDS) {
+        while (token != NULL && command_count < MAX_COMMANDS) 
+        {
             commands[command_count++] = token;
             token = strtok(NULL, "|");
         }
-
         if (command_count == 0) { // Should not happen if command[0] != '\0'
             continue;
         }
-        
+
         // Special command: "exit"
         // We need to trim whitespace from the first segment to check for "exit"
         char *first_command_trimmed = commands[0];
@@ -57,7 +67,7 @@ int main() {
             break;
         }
 
-
+        /* piping pre work*/
         int num_pipes = command_count - 1;
         int pipefds[2 * num_pipes]; // Array to hold all pipe file descriptors
                                     // Each pipe needs 2 fds: pipefds[i*2] for read, pipefds[i*2+1] for write
@@ -73,8 +83,8 @@ int main() {
             }
         }
 
-        // --- Main Execution Loop for Piped Commands ---
-        for (int i = 0; i < command_count; i++) {
+        /* You should start programming from here... */
+        for (int i = 0; i < command_count; i++){
             // Parse the current command segment (e.g., "ls -l") into command and arguments
             char *current_segment_str = strdup(commands[i]); // Duplicate because strtok modifies
             if (current_segment_str == NULL) {
@@ -147,7 +157,7 @@ int main() {
             }
             // --- Parent Process (continues in the loop to fork next child) ---
             free(current_segment_str); // Free the duplicated string for arguments
-        }
+        }   
 
     cleanup_pipes_and_continue:; // Label for goto, ensures pipes are closed
 
@@ -167,7 +177,7 @@ int main() {
                 // Optionally, check child exit status with WIFEXITED, WEXITSTATUS, etc.
             }
         }
-    } // End of while(1) loop
 
+    }  // End of while(1) loop
     return 0;
 }
