@@ -3,3 +3,8 @@ TP1-ARM/inputs/extranet/
 TP2-x86_64/ej1/tester
 TP2-x86_64/ej1/ej1_asm.o
 TP2-x86_64/ej1/main
+TP5-ThreadPool/src/test.py
+TP5-ThreadPool/src/test_custom.cc
+TP5-ThreadPool/src/tester.sh
+TP5-ThreadPool/src/valgrind_memcheck.log
+TP5-ThreadPool/src/Makefile
