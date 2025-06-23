@@ -8,3 +8,5 @@ TP5-ThreadPool/src/test_custom.cc
 TP5-ThreadPool/src/tester.sh
 TP5-ThreadPool/src/valgrind_memcheck.log
 TP5-ThreadPool/src/Makefile
+TP5-ThreadPool/src/test_custom_legacy.cc
+TP5-ThreadPool/src/valgrind_helgrind.log
